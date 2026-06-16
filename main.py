@@ -35,6 +35,8 @@ async def factura(request: Request, x_webhook_secret: str = Header(default=None)
         raise HTTPException(status_code=403, detail="Secret invalid")
 
     order = await request.json()
+    import json
+    log.info("ORDER JSON: %s", json.dumps(order, ensure_ascii=False))
     oid = wix_mapper.order_id(order)
     if not oid:
         raise HTTPException(status_code=400, detail="Comandă fără id")
