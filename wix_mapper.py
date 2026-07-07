@@ -68,14 +68,15 @@ def _client_from_order(order: dict) -> dict:
 def _vat_percent_for_line(line: dict) -> float:
     """
     Încearcă să citească cota de TVA a liniei. Wix poate expune taxRate ca '0.21' sau '21'.
-    Dacă nu găsim, folosim DEFAULT_VAT_PERCENT.
+    IMPORTANT: magazinul NU are taxe configurate în Wix, deci taxRate vine '0'.
+    0 sau lipsă => folosim DEFAULT_VAT_PERCENT (SmartBill nu are cotă 'Normala 0%').
     """
-    rate = _get(line, "taxInfo", "taxRate") or _get(line, "tax", "rate")  # VERIFICĂ
-    if rate is None:
-        return config.DEFAULT_VAT_PERCENT
+    rate = _get(line, "taxInfo", "taxRate") or _get(line, "tax", "rate")
     try:
         rate = float(rate)
     except (TypeError, ValueError):
+        return config.DEFAULT_VAT_PERCENT
+    if rate <= 0:
         return config.DEFAULT_VAT_PERCENT
     # normalizează 0.21 -> 21
     return rate * 100 if rate <= 1 else rate
@@ -83,7 +84,10 @@ def _vat_percent_for_line(line: dict) -> float:
 
 def build_invoice_payload(order: dict) -> dict:
     currency = order.get("currency", "RON")
-    tax_included = bool(order.get("taxIncludedInPrices", True))  # VERIFICĂ
+    # Prețurile de pe site sunt finale (cu TVA inclus). Nu ne bazăm pe
+    # order.taxIncludedInPrices: fără taxe configurate în Wix, vine False
+    # și SmartBill ar adăuga TVA PESTE prețul de pe site.
+    tax_included = True
 
     products = []
     for line in order.get("lineItems", []):
