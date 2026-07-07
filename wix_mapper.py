@@ -71,15 +71,18 @@ def _vat_percent_for_line(line: dict) -> float:
     IMPORTANT: magazinul NU are taxe configurate în Wix, deci taxRate vine '0'.
     0 sau lipsă => folosim DEFAULT_VAT_PERCENT (SmartBill nu are cotă 'Normala 0%').
     """
+    default = int(config.DEFAULT_VAT_PERCENT) if float(config.DEFAULT_VAT_PERCENT).is_integer() else config.DEFAULT_VAT_PERCENT
     rate = _get(line, "taxInfo", "taxRate") or _get(line, "tax", "rate")
     try:
         rate = float(rate)
     except (TypeError, ValueError):
-        return config.DEFAULT_VAT_PERCENT
+        return default
     if rate <= 0:
-        return config.DEFAULT_VAT_PERCENT
+        return default
     # normalizează 0.21 -> 21
-    return rate * 100 if rate <= 1 else rate
+    rate = rate * 100 if rate <= 1 else rate
+    # 21.0 -> 21 (SmartBill compară strict procentul cu cel definit pe cont)
+    return int(rate) if float(rate).is_integer() else rate
 
 
 def build_invoice_payload(order: dict) -> dict:
@@ -121,7 +124,7 @@ def build_invoice_payload(order: dict) -> dict:
             "price": shipping,
             "isTaxIncluded": tax_included,
             "taxName": config.DEFAULT_VAT_NAME,
-            "taxPercentage": config.DEFAULT_VAT_PERCENT,
+            "taxPercentage": int(config.DEFAULT_VAT_PERCENT) if float(config.DEFAULT_VAT_PERCENT).is_integer() else config.DEFAULT_VAT_PERCENT,
         })
 
     # NOTĂ discount: dacă magazinul folosește cupoane la nivel de comandă (nu pe linie),
