@@ -1,6 +1,7 @@
 """
 Serviciu de facturare Wix -> SmartBill.
-Primește comanda de la handler-ul Velo (onOrderPaid) și emite factura.
+Primește comanda de la butonul din pagina de AWB (sau alt apelant) și creează factura
+(ciornă cât timp DRY_RUN=true).
 """
 import logging
 
@@ -35,8 +36,6 @@ async def factura(request: Request, x_webhook_secret: str = Header(default=None)
         raise HTTPException(status_code=403, detail="Secret invalid")
 
     order = await request.json()
-    import json
-    log.info("ORDER JSON: %s", json.dumps(order, ensure_ascii=False))
     oid = wix_mapper.order_id(order)
     if not oid:
         raise HTTPException(status_code=400, detail="Comandă fără id")
@@ -47,18 +46,22 @@ async def factura(request: Request, x_webhook_secret: str = Header(default=None)
         log.info("Comanda %s deja facturată (%s%s)", oid, existing["series"], existing["number"])
         return {"status": "skip", "reason": "already_invoiced", "invoice": existing}
 
-    # 3. Construim payload-ul și emitem factura
+    # 3. Construim payload-ul și emitem factura / ciorna
     payload = wix_mapper.build_invoice_payload(order)
     try:
         result = sb.create_invoice(payload)
     except SmartBillError as e:
         log.error("Eroare SmartBill pentru comanda %s: %s", oid, e)
-        # 502 => Wix/Velo poate reîncerca; comanda NU e marcată ca facturată
         raise HTTPException(status_code=502, detail=str(e))
 
     series = result.get("series", config.SMARTBILL_SERIES)
     number = str(result.get("number", ""))
+    url = result.get("url", "") or ""
     storage.mark_invoiced(oid, series, number)
-    log.info("Factură emisă pentru comanda %s -> %s%s", oid, series, number)
+    log.info("Factură creată pentru comanda %s -> %s%s (draft=%s)", oid, series, number, config.DRY_RUN)
 
-    return {"status": "ok", "order_id": oid, "invoice": {"series": series, "number": number}}
+    return {
+        "status": "ok",
+        "order_id": oid,
+        "invoice": {"series": series, "number": number, "url": url},
+    }
