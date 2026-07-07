@@ -118,6 +118,7 @@ def build_invoice_payload(order: dict) -> dict:
     if shipping > 0:
         products.append({
             "name": "Transport",
+            "code": "TRANSPORT",
             "measuringUnitName": "buc",
             "currency": currency,
             "quantity": 1,
