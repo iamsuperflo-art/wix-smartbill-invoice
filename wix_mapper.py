@@ -54,7 +54,7 @@ def _client_from_order(order: dict) -> dict:
         "name": company if is_company else f"{first} {last}".strip() or "Client",
         "address": address.get("addressLine1", "") or address.get("addressLine", ""),
         "city": address.get("city", ""),
-        "county": address.get("subdivisionFullname") or address.get("subdivision", ""),  # VERIFICĂ
+        "county": address.get("subdivisionFullname") or (address.get("subdivision", "") or "").replace("RO-", ""),  # "RO-PH" -> "PH"
         "country": address.get("countryFullname") or address.get("country", "Romania"),
         "email": email,
         "isTaxPayer": is_company,
